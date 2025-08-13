@@ -1,1 +1,255 @@
-# Birthday-Wish
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Happy Birthday</title>
+  <style>
+    /* Layout and background */
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #05021a;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial;
+    }
+
+    #container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Card in center */
+    .card {
+      position: relative;
+      z-index: 20;
+      min-width: 260px;
+      padding: 28px 36px;
+      border-radius: 18px;
+      text-align: center;
+      backdrop-filter: blur(6px);
+      background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      margin: 0 0 8px;
+      letter-spacing: 1px;
+    }
+
+    p {
+      margin: 0;
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+
+    .from {
+      margin-top: 10px;
+      font-weight: 600;
+      opacity: 0.95;
+    }
+
+    /* Hint text */
+    .hint {
+      position: fixed;
+      left: 10px;
+      bottom: 10px;
+      color: rgba(255,255,255,0.6);
+      font-size: 13px;
+      z-index: 30;
+    }
+
+    /* Canvas for fireworks */
+    canvas#fx {
+      position: absolute;
+      inset: 0;
+      display: block;
+      z-index: 1;
+    }
+
+    /* Control buttons */
+    .controls {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 40;
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      background: rgba(255,255,255,0.06);
+      border: 0;
+      padding: 10px;
+      border-radius: 12px;
+      color: #fff;
+      backdrop-filter: blur(4px);
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <canvas id="fx"></canvas>
+
+    <div class="card">
+      <h1 id="title">🎉 Happy Birthday 🎉</h1>
+      <p id="subtitle">Wishing you a day full of joy, laughter and surprise!</p>
+      <div class="from">— wish by <span id="byname">Abdul</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="replay">Replay</button>
+      <button class="btn" id="mute">Mute</button>
+    </div>
+
+    <div class="hint">Tip: tap anywhere for a surprise burst ✨</div>
+  </div>
+
+  <script>
+    const CREATOR_NAME = 'Abdul';
+    document.getElementById('byname').textContent = CREATOR_NAME;
+
+    const canvas = document.getElementById('fx');
+    const ctx = canvas.getContext('2d');
+    let W = canvas.width = innerWidth;
+    let H = canvas.height = innerHeight;
+
+    window.addEventListener('resize', () => {
+      W = canvas.width = innerWidth;
+      H = canvas.height = innerHeight;
+    });
+
+    function rand(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    class Particle {
+      constructor(x, y, dx, dy, color, life, bright) {
+        this.x = x;
+        this.y = y;
+        this.dx = dx;
+        this.dy = dy;
+        this.color = color;
+        this.life = life;
+        this.age = 0;
+        this.bright = bright || 1;
+      }
+      update(dt) {
+        this.x += this.dx * dt;
+        this.y += this.dy * dt + 0.02 * dt * dt;
+        this.dy += 0.0008 * dt;
+        this.age += dt;
+      }
+      draw(ctx) {
+        const t = Math.max(0, 1 - this.age / this.life);
+        ctx.globalAlpha = t * 0.95;
+        ctx.beginPath();
+        ctx.fillStyle = this.color;
+        ctx.arc(this.x, this.y, Math.max(0.6, 2.6 * t * this.bright), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      alive() {
+        return this.age < this.life;
+      }
+    }
+
+    let particles = [];
+
+    function spawnFirework(x, y, spread = 6, count = 90, colors) {
+      const baseSpeed = rand(0.8, 1.6);
+      colors = colors || ['#ff4d4d', '#ffd24d', '#4de0ff', '#8d4dff', '#ff77b3', '#66ff99'];
+      for (let i = 0; i < count; i++) {
+        const angle = rand(0, Math.PI * 2);
+        const speed = baseSpeed * rand(0.4, 1.8) * (0.6 + 0.4 * Math.sin(i));
+        const dx = Math.cos(angle) * speed * spread;
+        const dy = Math.sin(angle) * speed * spread;
+        const color = colors[Math.floor(rand(0, colors.length))];
+        const life = rand(800, 1600);
+        const bright = rand(0.8, 1.6);
+        particles.push(new Particle(x, y, dx, dy, color, life, bright));
+      }
+    }
+
+    let lastEmit = 0;
+    function loop(ts) {
+      if (!loop.last) loop.last = ts;
+      const dt = ts - loop.last;
+      loop.last = ts;
+
+      ctx.fillStyle = 'rgba(5,2,26,0.25)';
+      ctx.fillRect(0, 0, W, H);
+
+      particles = particles.filter(p => p.alive());
+      for (const p of particles) {
+        p.update(dt);
+        p.draw(ctx);
+      }
+
+      lastEmit += dt;
+      if (lastEmit > rand(700, 1400)) {
+        lastEmit = 0;
+        const x = rand(W * 0.15, W * 0.85);
+        const y = rand(H * 0.08, H * 0.5);
+        spawnFirework(x, y, 6, 100);
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+
+    window.addEventListener('pointerdown', (e) => {
+      spawnFirework(e.clientX, e.clientY, 7, 140, ['#ffdd55', '#ff6b6b', '#4de0ff', '#b18cff']);
+    });
+
+    document.getElementById('replay').addEventListener('click', () => {
+      spawnFirework(W / 2, H / 2, 9, 260, ['#ffd24d', '#ff4d4d', '#66ff99', '#8d4dff', '#4de0ff']);
+    });
+
+    let audioCtx = null, muted = false;
+    function playChime() {
+      if (muted) return;
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = 760;
+      g.gain.value = 0.0001;
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.06, now + 0.02);
+      o.start(now);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+      o.stop(now + 0.7);
+    }
+
+    window.addEventListener('pointerdown', () => playChime());
+    document.getElementById('replay').addEventListener('click', () => playChime());
+
+    document.getElementById('mute').addEventListener('click', function () {
+      muted = !muted;
+      this.textContent = muted ? 'Unmute' : 'Mute';
+    });
+
+    const title = document.getElementById('title');
+    title.style.transform = 'translateY(-6px) scale(0.98)';
+    title.style.opacity = '0.0';
+    setTimeout(() => {
+      title.style.transition = 'all 420ms cubic-bezier(.2,.9,.2,1)';
+      title.style.transform = 'translateY(0) scale(1)';
+      title.style.opacity = '1';
+    }, 300);
+  </script>
+</body>
+  </html>
